@@ -156,7 +156,9 @@ func (db *DBwrap) RegisterUser(initiator *apitypes.User_Obj) (*apitypes.User_Obj
 
 func (db *DBwrap) CatList() (*[]apitypes.Category_Obj, error) {
 	// public, noauth, nopage
-	rows, err := db.db.Query(`SELECT id, name, parent_id, meta, created_at, updated_at FROM categories`)
+	rows, err := db.db.Query(`SELECT
+	id, name, parent_id, meta, created_at, updated_at 
+	FROM categories ORDER BY id ASC`)
 	if err != nil {
 		return nil, err
 	}
@@ -165,7 +167,7 @@ func (db *DBwrap) CatList() (*[]apitypes.Category_Obj, error) {
 	ret := &[]apitypes.Category_Obj{}
 	for rows.Next() {
 		var val apitypes.Category_Obj
-		rows.Scan(&val.Id, &val.Name)
+		rows.Scan(&val.Id, &val.Name, &val.ParentId, &val.Meta, &val.CreatedAt, &val.UpdatedAt)
 		*ret = append(*ret, val)
 	}
 	return ret, nil

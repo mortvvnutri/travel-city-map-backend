@@ -187,6 +187,8 @@ func apiPublic(w http.ResponseWriter, r *http.Request, endpoint string, operatio
 	switch endpoint {
 	case "user":
 		apiPubUser(w, r, operation, apireq)
+	case "category":
+		apiPubCats(w, r, operation, apireq)
 	default:
 		fmt.Println("invalid API endpoint")
 		homePage(w, r)
@@ -271,6 +273,19 @@ func apiPubUser(w http.ResponseWriter, r *http.Request, operation string, apireq
 	default:
 		fmt.Println("invalid API operation")
 		homePage(w, r)
+	}
+}
+
+func apiPubCats(w http.ResponseWriter, r *http.Request, operation string, apireq *apitypes.API_obj) {
+	switch operation {
+	case "list":
+		cats, err := dbl.CatList()
+		if err != nil || cats == nil {
+			ThrowApiErr(w, "Failed to fetch categories", err, 500)
+			return
+		}
+
+		apiRespond(w, &apitypes.API_obj{Categories: cats})
 	}
 }
 

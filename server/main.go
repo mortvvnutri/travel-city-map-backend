@@ -17,6 +17,9 @@ type env_cfg struct {
 	db *dblink.DBconfig
 }
 
+/*
+Loads .env file and compiles variables into struct
+*/
 func loadEnv() (*env_cfg, error) {
 	err := godotenv.Load()
 	if err != nil {
@@ -43,9 +46,12 @@ func loadEnv() (*env_cfg, error) {
 
 func main() {
 	fmt.Println("Please wait while the server is starting...")
+
+	// Keep the app rinning, listen for interrupts
 	sc := make(chan os.Signal, 1)
 	signal.Notify(sc, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT, syscall.SIGHUP)
 
+	// Load ENV file into env_cfg struct
 	env_vars, err := loadEnv()
 	if err != nil {
 		log.Fatal(err)
@@ -57,9 +63,10 @@ func main() {
 		log.Fatal(err)
 	}
 
+	// Block execution until interrupt is received
 	<-sc
 
+	// Start graceful shutdown
 	fmt.Println("Stopping server and saving data...")
 	weblink.Close()
-	// player.SaveRec()
 }
