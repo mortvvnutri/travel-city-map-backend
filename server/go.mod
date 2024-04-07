@@ -24,3 +24,7 @@ require (
 )
 
 replace tcm/apitypes => ./modules/apitypes
+
+
+require tcm/utils v0.0.0
+replace tcm/utils => ./modules/utils
