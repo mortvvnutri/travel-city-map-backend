@@ -70,7 +70,7 @@ func homePage(w http.ResponseWriter, r *http.Request) {
 	// 	return
 	// }
 	// http.Redirect(w, r, "/web/dashboard", http.StatusSeeOther)
-	fmt.Fprint(w, "404 not found")
+	// ThrowApiErr()
 	return
 }
 
@@ -128,30 +128,30 @@ func apiGlobalRouter(w http.ResponseWriter, r *http.Request) {
 	group, ok := vars["group"]
 	if !ok {
 		fmt.Println("group is missing in parameters")
-		homePage(w, r)
+		denyIncoming(w, r)
 		return
 	}
 	endpoint, ok := vars["endpoint"]
 	if !ok {
 		fmt.Println("endpoint is missing in parameters")
-		homePage(w, r)
+		denyIncoming(w, r)
 		return
 	}
 	operation, ok := vars["operation"]
 	if !ok {
 		fmt.Println("operation is missing in parameters")
-		homePage(w, r)
+		denyIncoming(w, r)
 		return
 	}
 	fmt.Println(endpoint + ":" + operation)
-	w.Header().Add("content-type", "application/json")
+
 	w.Header().Set("access-control-allow-origin", "*")
 
 	if r.Method != "POST" {
-		homePage(w, r)
+		denyIncoming(w, r)
 		return
 	}
-
+	w.Header().Add("content-type", "application/json")
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		apiRespond(w, &apitypes.API_obj{Error: &apitypes.ErrorStruct{Error: err.Error(), Message: "Could not read request body", Code: 500}})
@@ -170,8 +170,7 @@ func apiGlobalRouter(w http.ResponseWriter, r *http.Request) {
 		apiPublic(w, r, endpoint, operation, &apireq)
 	default:
 		fmt.Println("invalid API group")
-		homePage(w, r)
-		return
+		ThrowApiErr(w, "Invalid API group", nil, 400)
 	}
 
 	return
@@ -189,9 +188,11 @@ func apiPublic(w http.ResponseWriter, r *http.Request, endpoint string, operatio
 		apiPubUser(w, r, operation, apireq)
 	case "category":
 		apiPubCats(w, r, operation, apireq)
+	case "route":
+		apiPubRoute(w, r, operation, apireq)
 	default:
 		fmt.Println("invalid API endpoint")
-		homePage(w, r)
+		ThrowApiErr(w, "Invalid API endpoint", nil, 400)
 	}
 }
 
@@ -206,7 +207,7 @@ func apiPubUser(w http.ResponseWriter, r *http.Request, operation string, apireq
 	if operation != "login" && operation != "register" {
 		uo, err = checkTokenAndGetInfo(apireq.Initiator)
 		if err != nil {
-			denyIncoming(w, r)
+			ThrowApiErr(w, "token is invalid", nil, 403)
 			return
 		}
 	}
@@ -214,6 +215,19 @@ func apiPubUser(w http.ResponseWriter, r *http.Request, operation string, apireq
 	case "register":
 		if apireq == nil || apireq.Initiator == nil || apireq.Initiator.Email == nil || apireq.Initiator.Pwd == nil || apireq.Initiator.DisplayName == nil {
 			ThrowApiErr(w, "initiator email, password and display name must be present", nil, 401)
+			return
+		}
+
+		if len(*apireq.Initiator.Email) < 5 {
+			ThrowApiErr(w, "Email is invalid", nil, 400)
+			return
+		}
+		if len(*apireq.Initiator.Pwd) < 8 {
+			ThrowApiErr(w, "Password is too short", nil, 400)
+			return
+		}
+		if len(*apireq.Initiator.DisplayName) < 2 {
+			ThrowApiErr(w, "Name is too short", nil, 400)
 			return
 		}
 
@@ -272,7 +286,18 @@ func apiPubUser(w http.ResponseWriter, r *http.Request, operation string, apireq
 		apiRespond(w, &ap)
 	default:
 		fmt.Println("invalid API operation")
-		homePage(w, r)
+		ThrowApiErr(w, "Invalid API operation", nil, 400)
+	}
+}
+
+func apiPubWeather(w http.ResponseWriter, r *http.Request, operation string, apireq *apitypes.API_obj) {
+	switch operation {
+	case "now":
+		// weather now at the specified location or Moscow Center
+
+	default:
+		fmt.Println("invalid API operation")
+		ThrowApiErr(w, "Invalid API operation", nil, 400)
 	}
 }
 
@@ -286,6 +311,33 @@ func apiPubCats(w http.ResponseWriter, r *http.Request, operation string, apireq
 		}
 
 		apiRespond(w, &apitypes.API_obj{Categories: cats})
+	default:
+		ThrowApiErr(w, "Invalid API operation", nil, 400)
+	}
+}
+
+func apiPubRoute(w http.ResponseWriter, r *http.Request, operation string, apireq *apitypes.API_obj) {
+	switch operation {
+	case "build":
+		// Basic input validation
+		if apireq == nil ||
+			apireq.PosReq == nil ||
+			apireq.PosReq.MyLat == nil ||
+			apireq.PosReq.MyLong == nil ||
+			apireq.PosReq.Cats == nil ||
+			len(*apireq.PosReq.Cats) == 0 {
+			ThrowApiErr(w, "my_lat, my_long and cats must be present", nil, 400)
+			return
+		}
+
+		places, err := dbl.BuildRoute(apireq.PosReq)
+		if err != nil {
+			ThrowApiErr(w, "Unable to build a route", err, 500)
+			return
+		}
+		apiRespond(w, &apitypes.API_obj{Places: places})
+	default:
+		ThrowApiErr(w, "Invalid API operation", nil, 400)
 	}
 }
 
