@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"log"
 	"tcm/apitypes"
+	"tcm/utils"
 
+	"github.com/lib/pq"
 	_ "github.com/lib/pq"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -171,6 +173,86 @@ func (db *DBwrap) CatList() (*[]apitypes.Category_Obj, error) {
 		*ret = append(*ret, val)
 	}
 	return ret, nil
+}
+
+func (db *DBwrap) BuildRoute(pos_req *apitypes.PosReq_Obj) (*[]apitypes.Place_Obj, error) {
+	// public, noauth, nopage
+
+	// Basic validation
+	if pos_req == nil || pos_req.MyLat == nil || pos_req.MyLong == nil {
+		return nil, errors.New("required request parameters are not present")
+	}
+
+	ret := []apitypes.Place_Obj{}
+	if pos_req.Cats == nil || len([]int32(*pos_req.Cats)) == 0 {
+		// no route to build, return empty array
+		return &ret, nil
+	}
+
+	local_cats := []int32(*pos_req.Cats)
+
+	if len(local_cats) > 15 {
+		// expensive operation, deny
+		return nil, errors.New("maximum allowed points: 15")
+	}
+
+	var catset []int32
+	seen_places := make(map[int32]bool)
+	rolling_lat := *pos_req.MyLat
+	rolling_long := *pos_req.MyLong
+
+	slen := len(local_cats)
+	for i := 0; i < slen; i++ {
+		catset = utils.ToSetInt32(local_cats)
+		rows, err := db.db.Query(`SELECT 
+		id, name, description,
+		lat, long, p_options,
+		category_id, created_at, updated_at,
+		meta 
+		FROM places
+		WHERE
+		category_id = ANY($1::int[])
+		ORDER BY distance(lat, long, $2::double precision, $3::double precision) ASC
+		LIMIT 30`, pq.Array(catset), rolling_lat, rolling_long)
+		if err != nil {
+			return nil, err
+		}
+		defer rows.Close()
+		for rows.Next() {
+			var val apitypes.Place_Obj
+			rows.Scan(&val.Id, &val.Name, &val.Description,
+				&val.Lat, &val.Long, &val.POptions,
+				&val.CategoryId, &val.CreatedAt, &val.UpdatedAt,
+				&val.Meta)
+			if seen_places[int32(*val.Id)] {
+				// the place already exists in the route
+				continue
+			} else {
+				// the closest place is not yet in our route
+				// add it to our route and mark as seen
+				ret = append(ret, val)
+				seen_places[int32(*val.Id)] = true
+				break
+			}
+		}
+
+		// edge case where no places could be found
+		// on first iteration. Thus the route couldn't
+		// be built
+		if len(ret) == 0 {
+			break
+		}
+
+		// Get the last added category
+		last_found_cat := int32(*ret[len(ret)-1].CategoryId)
+		// Remove the category ONCE from local copy
+		local_cats = utils.RemoveSingleInt32(local_cats, last_found_cat)
+		// redefine our position to the place's coordinates
+		rolling_lat = *ret[len(ret)-1].Lat
+		rolling_long = *ret[len(ret)-1].Long
+	}
+
+	return &ret, nil
 }
 
 func (db *DBwrap) Close() error {
