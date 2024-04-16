@@ -1,0 +1,19 @@
+{
+  "name": "tests",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "devDependencies": {
+    "install": "^0.13.0",
+    "supertest": "^7.0.0"
+  },
+  "dependencies": {
+    "should": "^13.2.3"
+  }
+}
