@@ -51,6 +51,7 @@ var pb []string = []string{
 
 var JWT_PRIV_KEY *[]byte = &[]byte{}
 var dbl = dblink.DBwrap{}
+var OWM_api_key *string
 
 const (
 	WEB_CRYPTO_KEY_PATH = "./key.mkey"
@@ -293,6 +294,11 @@ func apiPubUser(w http.ResponseWriter, r *http.Request, operation string, apireq
 func apiPubWeather(w http.ResponseWriter, r *http.Request, operation string, apireq *apitypes.API_obj) {
 	switch operation {
 	case "now":
+		if OWM_api_key == nil {
+			ThrowApiErr(w, "Error while prepearing weather request", nil, 500)
+			fmt.Println("Attempted to query the weather, but no api key is configured")
+			return
+		}
 		// weather now at the specified location or Moscow Center
 
 	default:
@@ -501,8 +507,16 @@ func getBinFile(f string) ([]byte, error) {
 	return bs, err
 }
 
-func Init(db_cfg *dblink.DBconfig) error {
+func Init(db_cfg *dblink.DBconfig, owm_cfg *apitypes.OWM_CFG) error {
 	fmt.Println("Starting TCM API server...")
+
+	// owm cfg pre-validation
+	if owm_cfg == nil || owm_cfg.ApiKey == nil {
+		return errors.New("Open Weather Map config is not present")
+	}
+
+	OWM_api_key = owm_cfg.ApiKey
+
 	// init db
 	dbl = dblink.DBwrap{}
 	err := dbl.Init(db_cfg)

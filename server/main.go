@@ -7,6 +7,7 @@ import (
 	"os/signal"
 	"syscall"
 
+	"tcm/apitypes"
 	"tcm/dblink"
 	"tcm/weblink"
 
@@ -14,7 +15,8 @@ import (
 )
 
 type env_cfg struct {
-	db *dblink.DBconfig
+	db  *dblink.DBconfig
+	owm *apitypes.OWM_CFG
 }
 
 /*
@@ -33,12 +35,16 @@ func loadEnv() (*env_cfg, error) {
 	db_user := os.Getenv("DB_USER")
 	db_pwd := os.Getenv("DB_PWD")
 	db_name := os.Getenv("DB_DBNAME")
+	owm_api_key := os.Getenv("OWM_API_KEY")
 	ret.db = &dblink.DBconfig{
 		Host:   &db_host,
 		Port:   &db_port,
 		User:   &db_user,
 		Pwd:    &db_pwd,
 		Dbname: &db_name,
+	}
+	ret.owm = &apitypes.OWM_CFG{
+		ApiKey: &owm_api_key,
 	}
 
 	return &ret, nil
@@ -58,7 +64,7 @@ func main() {
 	}
 
 	// web and db
-	err = weblink.Init(env_vars.db)
+	err = weblink.Init(env_vars.db, env_vars.owm)
 	if err != nil {
 		log.Fatal(err)
 	}

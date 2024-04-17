@@ -138,6 +138,10 @@ type PosReq_Obj struct {
 
 // OpenWeatherMap
 
+type OWM_CFG struct {
+	ApiKey *string `json:"api_key,omitempty"`
+}
+
 type OWM_Weather struct {
 	Coord      *OWM_W_Coord         `json:"coord,omitempty"`
 	Weather    *OWM_W_Weather       `json:"weather,omitempty"`
