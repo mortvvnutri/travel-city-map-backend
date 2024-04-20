@@ -144,7 +144,7 @@ type OWM_CFG struct {
 
 type OWM_Weather struct {
 	Coord      *OWM_W_Coord         `json:"coord,omitempty"`
-	Weather    *OWM_W_Weather       `json:"weather,omitempty"`
+	Weather    *[]OWM_W_Weather     `json:"weather,omitempty"`
 	Base       *string              `json:"base,omitempty"`
 	Main       *OWM_W_Main          `json:"main,omitempty"`
 	Visibility *float32             `json:"visibility,omitempty"`

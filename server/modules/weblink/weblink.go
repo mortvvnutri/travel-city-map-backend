@@ -55,6 +55,8 @@ var OWM_api_key *string
 
 const (
 	WEB_CRYPTO_KEY_PATH = "./key.mkey"
+	OWM_DEFAULT_LAT     = 55.7509403
+	OWM_DEFAULT_LON     = 37.6175949
 )
 
 func checkTokenAndGetInfo(initiator *apitypes.User_Obj) (*apitypes.User_Obj, error) {
@@ -191,6 +193,8 @@ func apiPublic(w http.ResponseWriter, r *http.Request, endpoint string, operatio
 		apiPubCats(w, r, operation, apireq)
 	case "route":
 		apiPubRoute(w, r, operation, apireq)
+	case "weather":
+		apiPubWeather(w, r, operation, apireq)
 	default:
 		fmt.Println("invalid API endpoint")
 		ThrowApiErr(w, "Invalid API endpoint", nil, 400)
@@ -294,12 +298,52 @@ func apiPubUser(w http.ResponseWriter, r *http.Request, operation string, apireq
 func apiPubWeather(w http.ResponseWriter, r *http.Request, operation string, apireq *apitypes.API_obj) {
 	switch operation {
 	case "now":
+		// weather now at the specified location or Moscow Center
 		if OWM_api_key == nil {
 			ThrowApiErr(w, "Error while prepearing weather request", nil, 500)
 			fmt.Println("Attempted to query the weather, but no api key is configured")
 			return
 		}
-		// weather now at the specified location or Moscow Center
+		lat := OWM_DEFAULT_LAT
+		lon := OWM_DEFAULT_LON
+
+		if apireq != nil && apireq.PosReq != nil && apireq.PosReq.MyLat != nil && apireq.PosReq.MyLong != nil {
+			// we have a valid client position
+			// update the lat and lon from defaults
+			// to the provided position
+			lat = *apireq.PosReq.MyLat
+			lon = *apireq.PosReq.MyLong
+		}
+
+		requestURL := fmt.Sprintf("https://api.openweathermap.org/data/2.5/weather?lat=%f&lon=%f&units=metric&lang=ru&appid=%s",
+			lat, lon, *OWM_api_key)
+
+		req, err := http.NewRequest(http.MethodGet, requestURL, nil)
+		if err != nil {
+			ThrowApiErr(w, "Could not make a request", err, 500)
+			return
+		}
+
+		res, err := http.DefaultClient.Do(req)
+		if err != nil {
+			ThrowApiErr(w, "Error while making a request", err, 500)
+			return
+		}
+
+		resBody, err := io.ReadAll(res.Body)
+		if err != nil {
+			ThrowApiErr(w, "Error while reading a body", err, 500)
+			return
+		}
+
+		// Parse the response and reformat it to fit the API model
+		weather_resp := apitypes.OWM_Weather{}
+		err = json.Unmarshal(resBody, &weather_resp)
+		if err != nil {
+			ThrowApiErr(w, "Error while parsing a response", err, 500)
+			return
+		}
+		apiRespond(w, &apitypes.API_obj{Weather: &weather_resp})
 
 	default:
 		fmt.Println("invalid API operation")
