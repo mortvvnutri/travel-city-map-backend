@@ -10,6 +10,7 @@ require tcm/dblink v0.0.0
 
 require (
 	github.com/golang-jwt/jwt v3.2.2+incompatible // indirect
+	github.com/google/uuid v1.6.0 // indirect
 	github.com/gorilla/mux v1.8.1 // indirect
 	github.com/lib/pq v1.10.9 // indirect
 	golang.org/x/crypto v0.24.0 // indirect
@@ -24,6 +25,6 @@ require (
 
 replace tcm/apitypes => ./modules/apitypes
 
-
 require tcm/utils v0.0.0
+
 replace tcm/utils => ./modules/utils

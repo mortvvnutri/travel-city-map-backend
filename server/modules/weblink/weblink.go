@@ -2,6 +2,7 @@ package weblink
 
 import (
 	"bufio"
+	"bytes"
 	"crypto/rand"
 	"encoding/json"
 	"errors"
@@ -18,6 +19,7 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt"
+	"github.com/google/uuid"
 
 	"github.com/gorilla/mux"
 )
@@ -52,11 +54,17 @@ var pb []string = []string{
 var JWT_PRIV_KEY *[]byte = &[]byte{}
 var dbl = dblink.DBwrap{}
 var OWM_api_key *string
+var ALLOWED_FILE_TYPES = []string{
+	"image/png",
+	"image/jpeg",
+}
 
 const (
 	WEB_CRYPTO_KEY_PATH = "./key.mkey"
 	OWM_DEFAULT_LAT     = 55.7509403
 	OWM_DEFAULT_LON     = 37.6175949
+	FORM_LIMIT_BYTES    = 5000000
+	FILE_LIMIT_BYTES    = 5000000
 )
 
 func checkTokenAndGetInfo(initiator *apitypes.User_Obj) (*apitypes.User_Obj, error) {
@@ -92,10 +100,10 @@ func denyIncoming(w http.ResponseWriter, r *http.Request) {
 	if e != nil {
 		rd = big.NewInt(int64(0))
 	}
-	w.Header().Add("X-Powered-By", pb[rd.Int64()])
-	w.Header().Add("content-type", "text/plain")
+	w.Header().Set("X-Powered-By", pb[rd.Int64()])
+	w.Header().Set("content-type", "text/plain")
 	// w.Header().Add("access-control-allow-origin", "*")
-	w.Header().Add("Access-Control-Allow-Headers", "Content-Type, Access-Control-Allow-Headers, Authorization, X-Requested-With, Access-Key, API-usr, Token, ref-key, lu-key")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Access-Control-Allow-Headers, Authorization, X-Requested-With, Access-Key, API-usr, Token, ref-key, lu-key")
 	w.WriteHeader(403)
 	fmt.Fprintf(w, "403: Access denied")
 }
@@ -108,10 +116,10 @@ func preflight(w http.ResponseWriter, r *http.Request) {
 	if e != nil {
 		rd = big.NewInt(int64(0))
 	}
-	w.Header().Add("X-Powered-By", pb[rd.Int64()])
-	w.Header().Add("content-type", "text/plain")
-	w.Header().Add("access-control-allow-origin", "*")
-	w.Header().Add("Access-Control-Allow-Headers", "Content-Type, Access-Control-Allow-Headers, Authorization, X-Requested-With, Access-Key, API-usr, Token, ref-key, lu-key")
+	w.Header().Set("X-Powered-By", pb[rd.Int64()])
+	w.Header().Set("content-type", "text/plain")
+	w.Header().Set("access-control-allow-origin", "*")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Access-Control-Allow-Headers, Authorization, X-Requested-With, Access-Key, API-usr, Token, ref-key, lu-key")
 	w.WriteHeader(204)
 	fmt.Fprintf(w, "204: Access denied, but with love to the poor browser that for some reason wanted to access this page.")
 }
@@ -154,7 +162,12 @@ func apiGlobalRouter(w http.ResponseWriter, r *http.Request) {
 		denyIncoming(w, r)
 		return
 	}
-	w.Header().Add("content-type", "application/json")
+	if group == "public" && endpoint == "file" {
+		// branch early for file uploads
+		apiPubFiles(w, r, operation)
+		return
+	}
+	w.Header().Set("content-type", "application/json")
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		apiRespond(w, &apitypes.API_obj{Error: &apitypes.ErrorStruct{Error: err.Error(), Message: "Could not read request body", Code: 500}})
@@ -391,7 +404,87 @@ func apiPubRoute(w http.ResponseWriter, r *http.Request, operation string, apire
 	}
 }
 
+func apiPubFiles(w http.ResponseWriter, r *http.Request, operation string) {
+	// bypasses the usual API router
+	switch operation {
+	case "uploadpic":
+		receiveFile(w, r)
+	default:
+		ThrowApiErr(w, "Invalid API operation", nil, 400)
+	}
+}
+
+func receiveFile(w http.ResponseWriter, r *http.Request) {
+	err := r.ParseMultipartForm(FORM_LIMIT_BYTES)
+	if err != nil {
+		ThrowApiErr(w, "Could not parse the form data. Form data limit: 5mb", err, 400)
+		return
+	}
+
+	// first check parameters
+
+	token := r.Form.Get("token")
+
+	if token == "" {
+		ThrowApiErr(w, "token must be present", nil, 503)
+		return
+	}
+
+	initiator_user, err := verifyJWT(&token)
+	// _, err := GetUserDataByToken_short(req.Initiator.Token, true)
+	if err != nil {
+		ThrowApiErr(w, "Token is invalid", err, 401)
+		return
+	}
+	file, header, err := r.FormFile("file")
+	if err != nil {
+		ThrowApiErr(w, "Expected file upload", err, 503)
+		return
+	}
+
+	if header.Size > FILE_LIMIT_BYTES {
+		ThrowApiErr(w, "Failed to read the file, max size is 5mb", nil, 500)
+		return
+	}
+
+	defer file.Close()
+
+	var buf bytes.Buffer
+
+	io.Copy(&buf, file)
+
+	mime := http.DetectContentType(buf.Bytes())
+
+	if !inarr(mime, ALLOWED_FILE_TYPES) {
+		ThrowApiErr(w, "Files of this type are not allowed", nil, 400)
+		return
+	}
+
+	format := strings.Split(mime, "/")[1]
+
+	file_id := uuid.New().String()
+	base_path := fmt.Sprintf("/userfiles/user_%d/self", *initiator_user.Id)
+	err = os.MkdirAll("../cdn"+base_path, os.ModePerm)
+	if err != nil {
+		ThrowApiErr(w, "Could not create user subdirectories", err, 500)
+		return
+	}
+	final_path := fmt.Sprintf("%s/%s", base_path, file_id+"."+format)
+
+	err = os.WriteFile("../cdn"+final_path, buf.Bytes(), 0644)
+	if err != nil {
+		ThrowApiErr(w, "Failed to write the file", err, 500)
+		return
+	}
+
+	buf.Reset()
+	apiRespond(w, &apitypes.API_obj{File: &apitypes.File_Obj{
+		Path: &final_path,
+	}})
+}
+
 func apiRespond(w http.ResponseWriter, apiobj *apitypes.API_obj) {
+	w.Header().Set("content-type", "application/json")
 	j, err := json.Marshal(apiobj)
 	if err != nil {
 		ThrowApiErr(w, "Failed to respond with data", err, 500)
@@ -427,6 +520,7 @@ func fileserver(fs http.Handler) http.HandlerFunc {
 }
 
 func ThrowApiErr(w http.ResponseWriter, custom string, err error, code int) {
+	w.Header().Set("content-type", "application/json")
 	if custom != "" && err == nil {
 		apiRespond(w, &apitypes.API_obj{Error: &apitypes.ErrorStruct{Message: custom, Error: custom, Code: code}})
 		return

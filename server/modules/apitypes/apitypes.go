@@ -41,6 +41,14 @@ type API_obj struct {
 	PosReqs *[]PosReq_Obj `json:"pos_reqs,omitempty"`
 
 	Weather *OWM_Weather `json:"weather,omitempty"`
+
+	File *File_Obj `json:"file,omitempty"`
+}
+
+type File_Obj struct {
+	Path *string `json:"path,omitempty"`
+	Href *string `json:"href,omitempty"`
+	Name *string `json:"name,omitempty"`
 }
 
 type User_Obj struct {

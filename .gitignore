@@ -3,3 +3,5 @@ tmp
 *.crt
 *.key
 node_modules
+userfiles
+*.log
