@@ -105,6 +105,64 @@ func (db *DBwrap) GetUserInfoByEmail(email string, redact_pwd bool) (*apitypes.U
 	return &uo, nil
 }
 
+func (db *DBwrap) ChangeName(initiator *apitypes.User_Obj, to_profile *apitypes.User_Obj) (*apitypes.User_Obj, error) {
+	// quick validation
+	if to_profile == nil || to_profile.DisplayName == nil || initiator == nil || initiator.Id == nil {
+		return nil, errors.New("missing required parametes")
+	}
+	if len(*to_profile.DisplayName) > 64 || len(*to_profile.DisplayName) < 2 {
+		return nil, errors.New("invalid name length")
+	}
+	uo := &apitypes.User_Obj{}
+
+	err := db.db.QueryRow(`UPDATE users SET display_name=$1 WHERE id=$2 
+	RETURNING id, email, pic, preferred_cats, def_custom_place, display_name, meta, created_at, updated_at `,
+		to_profile.DisplayName, initiator.Id).Scan(
+		&uo.Id,
+		&uo.Email,
+		&uo.Pic,
+		&uo.PreferredCats,
+		&uo.DefCustomPlace,
+		&uo.DisplayName,
+		&uo.Meta,
+		&uo.CreatedAt,
+		&uo.UpdatedAt,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return uo, nil
+}
+
+func (db *DBwrap) ChangePic(initiator *apitypes.User_Obj, to_profile *apitypes.User_Obj) (*apitypes.User_Obj, error) {
+	// quick validation
+	if to_profile == nil || to_profile.Pic == nil || initiator == nil || initiator.Id == nil {
+		return nil, errors.New("missing required parametes")
+	}
+	if len(*to_profile.DisplayName) > 64 || len(*to_profile.DisplayName) < 2 {
+		return nil, errors.New("invalid name length")
+	}
+	uo := &apitypes.User_Obj{}
+
+	err := db.db.QueryRow(`UPDATE users SET pic=$1 WHERE id=$2 
+	RETURNING id, email, pic, preferred_cats, def_custom_place, display_name, meta, created_at, updated_at `,
+		to_profile.Pic, initiator.Id).Scan(
+		&uo.Id,
+		&uo.Email,
+		&uo.Pic,
+		&uo.PreferredCats,
+		&uo.DefCustomPlace,
+		&uo.DisplayName,
+		&uo.Meta,
+		&uo.CreatedAt,
+		&uo.UpdatedAt,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return uo, nil
+}
+
 func (db *DBwrap) CheckAuth(email string, pwd string) (*apitypes.User_Obj, error) {
 	if email == "" || pwd == "" {
 		return nil, errors.New("email or password is empty")
