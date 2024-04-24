@@ -287,6 +287,28 @@ func apiPubUser(w http.ResponseWriter, r *http.Request, operation string, apireq
 		resp := apitypes.API_obj{Token: &tk, User: usr}
 		// w.Header().Set("Set-Cookie", fmt.Sprintf("mc_token=%s; SameSite=Strict; Path=/; HttpOnly; Max-Age=%d;", tk, int(dt.Seconds())))
 		apiRespond(w, &resp)
+	case "changename":
+		if apireq == nil || apireq.User == nil {
+			ThrowApiErr(w, "missing required parameters", nil, 400)
+			return
+		}
+		r, err := dbl.ChangeName(uo, apireq.User)
+		if err != nil {
+			ThrowApiErr(w, "error updating the name", err, 400)
+			return
+		}
+		apiRespond(w, &apitypes.API_obj{User: r})
+	case "changepic":
+		if apireq == nil || apireq.User == nil {
+			ThrowApiErr(w, "missing required parameters", nil, 400)
+			return
+		}
+		r, err := dbl.ChangePic(uo, apireq.User)
+		if err != nil {
+			ThrowApiErr(w, "error updating the profile picture", err, 400)
+			return
+		}
+		apiRespond(w, &apitypes.API_obj{User: r})
 	case "logout":
 		// w.Header().Set("Set-Cookie", "mc_token=none; SameSite=Strict; Path=/; HttpOnly; Max-Age=-1;")
 		http.Redirect(w, r, "/web/login", http.StatusSeeOther)

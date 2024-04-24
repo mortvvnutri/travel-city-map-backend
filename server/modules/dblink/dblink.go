@@ -139,8 +139,8 @@ func (db *DBwrap) ChangePic(initiator *apitypes.User_Obj, to_profile *apitypes.U
 	if to_profile == nil || to_profile.Pic == nil || initiator == nil || initiator.Id == nil {
 		return nil, errors.New("missing required parametes")
 	}
-	if len(*to_profile.DisplayName) > 64 || len(*to_profile.DisplayName) < 2 {
-		return nil, errors.New("invalid name length")
+	if len(*to_profile.Pic) > 128 {
+		return nil, errors.New("invalid url length")
 	}
 	uo := &apitypes.User_Obj{}
 
