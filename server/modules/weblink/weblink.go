@@ -422,6 +422,31 @@ func apiPubRoute(w http.ResponseWriter, r *http.Request, operation string, apire
 			return
 		}
 		apiRespond(w, &apitypes.API_obj{Places: places})
+	case "save":
+		if apireq == nil || apireq.Initiator == nil || apireq.Initiator.Token == nil {
+			ThrowApiErr(w, "You need to be authorized to perform this operation", nil, 401)
+			return
+		}
+
+		if apireq.Route == nil || apireq.Route.DisplayName == nil {
+			ThrowApiErr(w, "Missing required parameters", nil, 400)
+			return
+		}
+
+		uo, err := verifyJWT(apireq.Initiator.Token)
+		if err != nil {
+			ThrowApiErr(w, "Token is invalid", err, 401)
+			return
+		}
+
+		route_ret, err := dbl.SaveRoute(uo, apireq.Route)
+		if err != nil {
+			ThrowApiErr(w, "Unable to save the route", err, 500)
+			return
+		}
+
+		apiRespond(w, &apitypes.API_obj{Route: route_ret})
+
 	default:
 		ThrowApiErr(w, "Invalid API operation", nil, 400)
 	}
