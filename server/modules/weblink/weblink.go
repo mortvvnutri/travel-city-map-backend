@@ -54,6 +54,7 @@ var pb []string = []string{
 var JWT_PRIV_KEY *[]byte = &[]byte{}
 var dbl = dblink.DBwrap{}
 var OWM_api_key *string
+var CDN_URL *string
 var ALLOWED_FILE_TYPES = []string{
 	"image/png",
 	"image/jpeg",
@@ -500,8 +501,10 @@ func receiveFile(w http.ResponseWriter, r *http.Request) {
 	}
 
 	buf.Reset()
+	f_url := *CDN_URL + final_path
 	apiRespond(w, &apitypes.API_obj{File: &apitypes.File_Obj{
-		Path: &final_path,
+		Href:    &final_path,
+		FullUrl: &f_url,
 	}})
 }
 
@@ -667,13 +670,19 @@ func getBinFile(f string) ([]byte, error) {
 	return bs, err
 }
 
-func Init(db_cfg *dblink.DBconfig, owm_cfg *apitypes.OWM_CFG) error {
+func Init(db_cfg *dblink.DBconfig, owm_cfg *apitypes.OWM_CFG, cdn_url *string) error {
 	fmt.Println("Starting TCM API server...")
 
 	// owm cfg pre-validation
 	if owm_cfg == nil || owm_cfg.ApiKey == nil {
 		return errors.New("Open Weather Map config is not present")
 	}
+
+	if cdn_url == nil {
+		return errors.New("CDN url is not present")
+	}
+
+	CDN_URL = cdn_url
 
 	OWM_api_key = owm_cfg.ApiKey
 

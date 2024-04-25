@@ -46,9 +46,9 @@ type API_obj struct {
 }
 
 type File_Obj struct {
-	Path *string `json:"path,omitempty"`
-	Href *string `json:"href,omitempty"`
-	Name *string `json:"name,omitempty"`
+	FullUrl *string `json:"full_url,omitempty"`
+	Href    *string `json:"href,omitempty"`
+	Name    *string `json:"name,omitempty"`
 }
 
 type User_Obj struct {
