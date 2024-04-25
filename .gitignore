@@ -5,3 +5,4 @@ tmp
 node_modules
 userfiles
 *.log
+package
