@@ -23,6 +23,7 @@ type DBwrap_int interface {
 
 const (
 	DB_FILE_PATH = "./storage.db"
+	KM           = 0.012685281829263324
 )
 
 type DBwrap struct {
@@ -308,6 +309,48 @@ func (db *DBwrap) BuildRoute(pos_req *apitypes.PosReq_Obj) (*[]apitypes.Place_Ob
 		// redefine our position to the place's coordinates
 		rolling_lat = *ret[len(ret)-1].Lat
 		rolling_long = *ret[len(ret)-1].Long
+	}
+
+	return &ret, nil
+}
+
+func (db *DBwrap) PlacesNearby(pos_req *apitypes.PosReq_Obj) (*[]apitypes.Place_Obj, error) {
+	// public, noauth, nopage
+
+	// Basic validation
+	if pos_req == nil || pos_req.MyLat == nil || pos_req.MyLong == nil {
+		return nil, errors.New("required request parameters are not present")
+	}
+
+	ret := []apitypes.Place_Obj{}
+
+	rows, err := db.db.Query(`WITH pre AS (
+		SELECT
+		id, name, description,
+		lat, long, p_options,
+		category_id, created_at, updated_at,
+		meta,
+		distance(lat, long, $1::double precision, $2::double precision) dist
+		FROM places
+		ORDER BY dist ASC
+		LIMIT 100
+	)
+	SELECT * from pre
+	WHERE dist<=$3::double precision`, pos_req.MyLat, pos_req.MyLong, KM)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var val apitypes.Place_Obj
+		rows.Scan(&val.Id, &val.Name, &val.Description,
+			&val.Lat, &val.Long, &val.POptions,
+			&val.CategoryId, &val.CreatedAt, &val.UpdatedAt,
+			&val.Meta,
+			&val.Distance,
+		)
+		ret = append(ret, val)
 	}
 
 	return &ret, nil

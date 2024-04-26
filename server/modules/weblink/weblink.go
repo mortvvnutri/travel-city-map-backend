@@ -209,6 +209,8 @@ func apiPublic(w http.ResponseWriter, r *http.Request, endpoint string, operatio
 		apiPubRoute(w, r, operation, apireq)
 	case "weather":
 		apiPubWeather(w, r, operation, apireq)
+	case "place":
+		apiPubPlaces(w, r, operation, apireq)
 	default:
 		fmt.Println("invalid API endpoint")
 		ThrowApiErr(w, "Invalid API endpoint", nil, 400)
@@ -397,6 +399,25 @@ func apiPubCats(w http.ResponseWriter, r *http.Request, operation string, apireq
 		}
 
 		apiRespond(w, &apitypes.API_obj{Categories: cats})
+	default:
+		ThrowApiErr(w, "Invalid API operation", nil, 400)
+	}
+}
+
+func apiPubPlaces(w http.ResponseWriter, r *http.Request, operation string, apireq *apitypes.API_obj) {
+	switch operation {
+	case "near":
+		if apireq == nil || apireq.PosReq == nil || apireq.PosReq.MyLat == nil || apireq.PosReq.MyLong == nil {
+			ThrowApiErr(w, "You must specify your position in a pos_req", nil, 400)
+			return
+		}
+		places, err := dbl.PlacesNearby(apireq.PosReq)
+		if err != nil {
+			ThrowApiErr(w, "Failed to fetch nearby places", err, 500)
+			return
+		}
+
+		apiRespond(w, &apitypes.API_obj{Places: places})
 	default:
 		ThrowApiErr(w, "Invalid API operation", nil, 400)
 	}

@@ -115,6 +115,8 @@ type Place_Obj struct {
 	Meta        *string        `json:"meta,omitempty"`
 	CreatedAt   *time.Time     `json:"created_at,omitempty"`
 	UpdatedAt   *time.Time     `json:"updated_at,omitempty"`
+
+	Distance *float64 `json:"distance,omitempty"`
 }
 
 type Category_Obj struct {
