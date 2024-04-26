@@ -465,6 +465,25 @@ func apiPubRoute(w http.ResponseWriter, r *http.Request, operation string, apire
 		}
 
 		apiRespond(w, &apitypes.API_obj{Routes: routes_ret})
+	case "complete":
+		if apireq == nil || apireq.Initiator == nil || apireq.Initiator.Token == nil || apireq.Route == nil || apireq.Route.Id == nil {
+			ThrowApiErr(w, "You need to be authorized to perform this operation and supply a route ID to be completed", nil, 401)
+			return
+		}
+
+		uo, err := verifyJWT(apireq.Initiator.Token)
+		if err != nil {
+			ThrowApiErr(w, "Token is invalid", err, 401)
+			return
+		}
+
+		route_ret, err := dbl.CompleteRoute(uo, apireq.Route)
+		if err != nil {
+			ThrowApiErr(w, "Unable to complete the route", err, 500)
+			return
+		}
+
+		apiRespond(w, &apitypes.API_obj{Route: route_ret})
 
 	default:
 		ThrowApiErr(w, "Invalid API operation", nil, 400)
