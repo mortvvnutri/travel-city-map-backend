@@ -349,6 +349,36 @@ func (db *DBwrap) SaveRoute(initiator *apitypes.User_Obj, route *apitypes.Route_
 	return ret, nil
 }
 
+func (db *DBwrap) ListRoutes(initiator *apitypes.User_Obj) (*[]apitypes.Route_Obj, error) {
+	if initiator == nil || initiator.Id == nil {
+		return nil, errors.New("missing required parameters")
+	}
+	ret := &[]apitypes.Route_Obj{}
+
+	rows, err := db.db.Query(`SELECT
+	id, user_id, places, categories,
+	times_completed, total_distance, start_p, end_p,
+	display_name, route_data, time_took, meta,
+	created_at, updated_at
+	FROM routes
+	WHERE user_id=$1
+	ORDER BY updated_at DESC`, initiator.Id)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var val apitypes.Route_Obj
+		rows.Scan(&val.Id, &val.UserId, &val.Places, &val.Categories,
+			&val.TimesCompleted, &val.TotalDistance, &val.StartP, &val.EndP,
+			&val.DisplayName, &val.RouteData, &val.TimeTook, &val.Meta,
+			&val.CreatedAt, &val.UpdatedAt)
+		*ret = append(*ret, val)
+	}
+
+	return ret, nil
+}
+
 func (db *DBwrap) Close() error {
 	if db.db != nil {
 		return db.db.Close()
