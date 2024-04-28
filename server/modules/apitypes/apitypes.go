@@ -28,8 +28,8 @@ type API_obj struct {
 	RHJ  *Routes_History_Join   `json:"rhj,omitempty"`
 	RHJs *[]Routes_History_Join `json:"rhjs,omitempty"`
 
-	Feedback  *Feedback_Obj   `json:"feedback,omitempty"`
-	Feedbacks *[]Feedback_Obj `json:"feedbacks,omitempty"`
+	Review  *Review_Obj   `json:"review,omitempty"`
+	Reviews *[]Review_Obj `json:"reviews,omitempty"`
 
 	Place  *Place_Obj   `json:"place,omitempty"`
 	Places *[]Place_Obj `json:"places,omitempty"`
@@ -70,6 +70,8 @@ type User_Obj struct {
 	Meta           *string        `json:"meta,omitempty"`
 	CreatedAt      *time.Time     `json:"created_at,omitempty"`
 	UpdatedAt      *time.Time     `json:"updated_at,omitempty"`
+
+	CustomPlace *CustomPlace_Obj `json:"custom_place,omitempty"`
 }
 
 type Route_Obj struct {
@@ -97,7 +99,7 @@ type Routes_History_Join struct {
 	UpdatedAt *time.Time `json:"updated_at,omitempty"`
 }
 
-type Feedback_Obj struct {
+type Review_Obj struct {
 	UserId    *int       `json:"user_id,omitempty"`
 	PlaceId   *int       `json:"place_id,omitempty"`
 	Comment   *string    `json:"comment,omitempty"`
@@ -105,6 +107,8 @@ type Feedback_Obj struct {
 	Meta      *string    `json:"meta,omitempty"`
 	CreatedAt *time.Time `json:"created_at,omitempty"`
 	UpdatedAt *time.Time `json:"updated_at,omitempty"`
+
+	Author *User_Obj `json:"author,omitempty"`
 }
 
 type Place_Obj struct {
@@ -113,11 +117,15 @@ type Place_Obj struct {
 	Description *string        `json:"description,omitempty"`
 	Lat         *float64       `json:"lat,omitempty"`
 	Long        *float64       `json:"long,omitempty"`
+	Rating      *float64       `json:"rating,omitempty"`
 	CategoryId  *int           `json:"category_id,omitempty"`
 	POptions    *pq.Int32Array `json:"p_options,omitempty"`
 	Meta        *string        `json:"meta,omitempty"`
 	CreatedAt   *time.Time     `json:"created_at,omitempty"`
 	UpdatedAt   *time.Time     `json:"updated_at,omitempty"`
+
+	Review  *Review_Obj   `json:"review,omitempty"`
+	Reviews *[]Review_Obj `json:"reviews,omitempty"`
 
 	Distance *float64 `json:"distance,omitempty"`
 }

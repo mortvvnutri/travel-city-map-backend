@@ -211,6 +211,8 @@ func apiPublic(w http.ResponseWriter, r *http.Request, endpoint string, operatio
 		apiPubWeather(w, r, operation, apireq)
 	case "place":
 		apiPubPlaces(w, r, operation, apireq)
+	case "review":
+		apiPubReviews(w, r, operation, apireq)
 	default:
 		fmt.Println("invalid API endpoint")
 		ThrowApiErr(w, "Invalid API endpoint", nil, 400)
@@ -385,6 +387,33 @@ func apiPubWeather(w http.ResponseWriter, r *http.Request, operation string, api
 
 	default:
 		fmt.Println("invalid API operation")
+		ThrowApiErr(w, "Invalid API operation", nil, 400)
+	}
+}
+
+func apiPubReviews(w http.ResponseWriter, r *http.Request, operation string, apireq *apitypes.API_obj) {
+	switch operation {
+	case "create":
+		if apireq == nil || apireq.Initiator == nil || apireq.Initiator.Token == nil {
+			ThrowApiErr(w, "You must be authorized to perform this action", nil, 401)
+			return
+		}
+		if apireq.Review == nil || apireq.Review.PlaceId == nil || apireq.Review.Rating == nil {
+			ThrowApiErr(w, "Missing required parameters in review", nil, 400)
+			return
+		}
+		uo, err := verifyJWT(apireq.Initiator.Token)
+		if err != nil {
+			ThrowApiErr(w, "Token is invalid", err, 401)
+			return
+		}
+		rev, err := dbl.CreateReview(uo, apireq.Review)
+		if err != nil {
+			ThrowApiErr(w, "Failed to submit a review", err, 500)
+			return
+		}
+		apiRespond(w, &apitypes.API_obj{Review: rev})
+	default:
 		ThrowApiErr(w, "Invalid API operation", nil, 400)
 	}
 }

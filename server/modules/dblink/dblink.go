@@ -333,7 +333,7 @@ func (db *DBwrap) PlacesNearby(pos_req *apitypes.PosReq_Obj) (*[]apitypes.Place_
 		id, name, description,
 		lat, long, p_options,
 		category_id, created_at, updated_at,
-		meta,
+		meta, rating,
 		distance(lat, long, $1::double precision, $2::double precision) dist
 		FROM places
 		ORDER BY dist ASC
@@ -351,7 +351,7 @@ func (db *DBwrap) PlacesNearby(pos_req *apitypes.PosReq_Obj) (*[]apitypes.Place_
 		rows.Scan(&val.Id, &val.Name, &val.Description,
 			&val.Lat, &val.Long, &val.POptions,
 			&val.CategoryId, &val.CreatedAt, &val.UpdatedAt,
-			&val.Meta,
+			&val.Meta, &val.Rating,
 			&val.Distance,
 		)
 		ret = append(ret, val)
@@ -574,6 +574,63 @@ func (db *DBwrap) SetDefaultPlace(initiator *apitypes.User_Obj, place *apitypes.
 		&uo.UpdatedAt,
 	)
 	return uo, err
+}
+
+func (db *DBwrap) CreateReview(initiator *apitypes.User_Obj, review *apitypes.Review_Obj) (*apitypes.Review_Obj, error) {
+	if initiator == nil || initiator.Id == nil {
+		return nil, errors.New("authorization is required")
+	}
+
+	if review == nil || review.PlaceId == nil || review.Rating == nil {
+		return nil, errors.New("missing required parameters")
+	}
+
+	if *review.Rating < 0 || *review.Rating > 5 {
+		return nil, errors.New("review score is invalid")
+	}
+
+	// Check if the review already exists
+	chk_rate := -1
+	err := db.db.QueryRow(`SELECT COUNT(rating) FROM reviews WHERE user_id=$1 AND place_id=$2`, initiator.Id, review.PlaceId).Scan(&chk_rate)
+	if err != nil {
+		return nil, err
+	}
+
+	ret := &apitypes.Review_Obj{}
+
+	if chk_rate >= 1 {
+		// update
+		err = db.db.QueryRow(`UPDATE reviews SET rating=$1, comment=$2 WHERE user_id=$3 AND place_id=$4 
+		RETURNING rating, comment, created_at, updated_at, user_id, place_id `,
+			review.Rating, review.Comment, initiator.Id, review.PlaceId).Scan(
+			&ret.Rating,
+			&ret.Comment,
+			&ret.CreatedAt,
+			&ret.UpdatedAt,
+			&ret.UserId,
+			&ret.PlaceId,
+		)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		// insert
+		err = db.db.QueryRow(`INSERT INTO reviews (rating, comment, user_id, place_id) VALUES($1, $2, $3, $4)
+		RETURNING rating, comment, created_at, updated_at, user_id, place_id `,
+			review.Rating, review.Comment, initiator.Id, review.PlaceId).Scan(
+			&ret.Rating,
+			&ret.Comment,
+			&ret.CreatedAt,
+			&ret.UpdatedAt,
+			&ret.UserId,
+			&ret.PlaceId,
+		)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return ret, err
 }
 
 func (db *DBwrap) Close() error {
