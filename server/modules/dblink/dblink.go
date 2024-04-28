@@ -215,6 +215,9 @@ func (db *DBwrap) RegisterUser(initiator *apitypes.User_Obj) (*apitypes.User_Obj
 	return usr, nil
 }
 
+/*
+db.CatList() - Returns a list of categories that exist in the database
+*/
 func (db *DBwrap) CatList() (*[]apitypes.Category_Obj, error) {
 	// public, noauth, nopage
 	rows, err := db.db.Query(`SELECT
@@ -234,6 +237,7 @@ func (db *DBwrap) CatList() (*[]apitypes.Category_Obj, error) {
 	return ret, nil
 }
 
+// Builds a route from the selected categories and a current user position
 func (db *DBwrap) BuildRoute(pos_req *apitypes.PosReq_Obj) (*[]apitypes.Place_Obj, error) {
 	// public, noauth, nopage
 
@@ -450,7 +454,126 @@ func (db *DBwrap) CompleteRoute(initiator *apitypes.User_Obj, route *apitypes.Ro
 	}
 
 	return ret, nil
+}
 
+func (db *DBwrap) CreateCustomPlace(initiator *apitypes.User_Obj, place *apitypes.CustomPlace_Obj) (*apitypes.CustomPlace_Obj, error) {
+	if initiator == nil || initiator.Id == nil {
+		return nil, errors.New("authorization is required")
+	}
+
+	if place == nil || place.Name == nil || place.Lat == nil || place.Lat == nil {
+		return nil, errors.New("missing required parameters")
+	}
+
+	ret := apitypes.CustomPlace_Obj{}
+	err := db.db.QueryRow(`INSERT INTO
+		custom_places(user_id, name, lat,
+			 long, meta)
+		VALUES ($1, $2, $3, $4, $5)
+		RETURNING
+		id, user_id, name,
+		lat, long, meta,
+		created_at, updated_at;`,
+		initiator.Id, place.Name, place.Lat,
+		place.Long, place.Meta,
+	).Scan(
+		&ret.Id, &ret.UserId, &ret.Name,
+		&ret.Lat, &ret.Long, &ret.Meta,
+		&ret.CreatedAt, &ret.UpdatedAt,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return &ret, nil
+}
+
+func (db *DBwrap) ListMyCustomPlaces(initiator *apitypes.User_Obj) (*[]apitypes.CustomPlace_Obj, error) {
+	if initiator == nil || initiator.Id == nil {
+		return nil, errors.New("missing required parameters")
+	}
+	ret := &[]apitypes.CustomPlace_Obj{}
+
+	rows, err := db.db.Query(`SELECT
+	id, user_id, name,
+	lat, long, meta,
+	created_at, updated_at
+	FROM custom_places
+	WHERE user_id=$1
+	ORDER BY updated_at DESC`, initiator.Id)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var val apitypes.CustomPlace_Obj
+		rows.Scan(&val.Id, &val.UserId, &val.Name,
+			&val.Lat, &val.Long, &val.Meta,
+			&val.CreatedAt, &val.UpdatedAt)
+		*ret = append(*ret, val)
+	}
+
+	return ret, nil
+}
+
+func (db *DBwrap) DeleteCustomPlace(initiator *apitypes.User_Obj, place *apitypes.CustomPlace_Obj) error {
+	if initiator == nil || initiator.Id == nil {
+		return errors.New("authorization is required")
+	}
+
+	if place == nil || place.Id == nil {
+		return errors.New("missing required parameters")
+	}
+	_, err := db.db.Exec(`DELETE FROM
+		custom_places
+		WHERE
+		user_id=$1 AND id=$2
+		`,
+		initiator.Id, place.Id,
+	)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (db *DBwrap) SetDefaultPlace(initiator *apitypes.User_Obj, place *apitypes.CustomPlace_Obj) (*apitypes.User_Obj, error) {
+	if initiator == nil || initiator.Id == nil {
+		return nil, errors.New("authorization is required")
+	}
+
+	if place == nil || place.Id == nil {
+		return nil, errors.New("missing required parameters")
+	}
+
+	// Check if the place actually belongs to out user and yeet them otherwise
+	tgt_id := -1
+	err := db.db.QueryRow(`SELECT user_id FROM custom_places WHERE id=$1`, place.Id).Scan(&tgt_id)
+	if err != nil {
+		return nil, err
+	}
+
+	if tgt_id != *initiator.Id {
+		return nil, errors.New("you do not have required permissions to perform that action")
+	}
+
+	uo := &apitypes.User_Obj{}
+
+	err = db.db.QueryRow(`UPDATE users SET def_custom_place=$1 WHERE id=$2 
+	RETURNING id, email, pic, preferred_cats, def_custom_place, display_name, meta, created_at, updated_at `,
+		place.Id, initiator.Id).Scan(
+		&uo.Id,
+		&uo.Email,
+		&uo.Pic,
+		&uo.PreferredCats,
+		&uo.DefCustomPlace,
+		&uo.DisplayName,
+		&uo.Meta,
+		&uo.CreatedAt,
+		&uo.UpdatedAt,
+	)
+	return uo, err
 }
 
 func (db *DBwrap) Close() error {

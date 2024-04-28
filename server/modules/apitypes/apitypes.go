@@ -34,6 +34,9 @@ type API_obj struct {
 	Place  *Place_Obj   `json:"place,omitempty"`
 	Places *[]Place_Obj `json:"places,omitempty"`
 
+	CustomPlace  *CustomPlace_Obj   `json:"custom_place,omitempty"`
+	CustomPlaces *[]CustomPlace_Obj `json:"custom_places,omitempty"`
+
 	Category   *Category_Obj   `json:"category,omitempty"`
 	Categories *[]Category_Obj `json:"categories,omitempty"`
 

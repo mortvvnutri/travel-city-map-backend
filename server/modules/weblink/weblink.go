@@ -418,6 +418,91 @@ func apiPubPlaces(w http.ResponseWriter, r *http.Request, operation string, apir
 		}
 
 		apiRespond(w, &apitypes.API_obj{Places: places})
+	case "addcustom":
+		if apireq == nil || apireq.Initiator == nil || apireq.Initiator.Token == nil {
+			ThrowApiErr(w, "You must be authorized to perform this action", nil, 401)
+			return
+		}
+		if apireq.CustomPlace == nil || apireq.CustomPlace.Name == nil || apireq.CustomPlace.Lat == nil || apireq.CustomPlace.Long == nil {
+			ThrowApiErr(w, "Missing required parameters in custom_place", nil, 400)
+			return
+		}
+		uo, err := verifyJWT(apireq.Initiator.Token)
+		if err != nil {
+			ThrowApiErr(w, "Token is invalid", err, 401)
+			return
+		}
+
+		place, err := dbl.CreateCustomPlace(uo, apireq.CustomPlace)
+		if err != nil {
+			ThrowApiErr(w, "Failed to create a custom place. Perhaps the name is already in use", err, 500)
+			return
+		}
+
+		apiRespond(w, &apitypes.API_obj{CustomPlace: place})
+	case "setdefault":
+		if apireq == nil || apireq.Initiator == nil || apireq.Initiator.Token == nil {
+			ThrowApiErr(w, "You must be authorized to perform this action", nil, 401)
+			return
+		}
+		if apireq.CustomPlace == nil || apireq.CustomPlace.Id == nil {
+			ThrowApiErr(w, "Missing required parameters in custom_place", nil, 400)
+			return
+		}
+		uo, err := verifyJWT(apireq.Initiator.Token)
+		if err != nil {
+			ThrowApiErr(w, "Token is invalid", err, 401)
+			return
+		}
+
+		user_ret, err := dbl.SetDefaultPlace(uo, apireq.CustomPlace)
+		if err != nil {
+			ThrowApiErr(w, "Failed to set the default place for the user", err, 500)
+			return
+		}
+
+		apiRespond(w, &apitypes.API_obj{User: user_ret})
+	case "delcustom":
+		if apireq == nil || apireq.Initiator == nil || apireq.Initiator.Token == nil {
+			ThrowApiErr(w, "You must be authorized to perform this action", nil, 401)
+			return
+		}
+		if apireq.CustomPlace == nil || apireq.CustomPlace.Id == nil {
+			ThrowApiErr(w, "Missing required parameters in custom_place", nil, 400)
+			return
+		}
+		uo, err := verifyJWT(apireq.Initiator.Token)
+		if err != nil {
+			ThrowApiErr(w, "Token is invalid", err, 401)
+			return
+		}
+
+		err = dbl.DeleteCustomPlace(uo, apireq.CustomPlace)
+		if err != nil {
+			ThrowApiErr(w, "Failed to set the default place for the user", err, 500)
+			return
+		}
+
+		sok := "ok"
+		apiRespond(w, &apitypes.API_obj{Status: &sok})
+	case "listcustom":
+		if apireq == nil || apireq.Initiator == nil || apireq.Initiator.Token == nil {
+			ThrowApiErr(w, "You must be authorized to perform this action", nil, 401)
+			return
+		}
+		uo, err := verifyJWT(apireq.Initiator.Token)
+		if err != nil {
+			ThrowApiErr(w, "Token is invalid", err, 401)
+			return
+		}
+
+		places, err := dbl.ListMyCustomPlaces(uo)
+		if err != nil {
+			ThrowApiErr(w, "Failed to set get the custom places", err, 500)
+			return
+		}
+
+		apiRespond(w, &apitypes.API_obj{CustomPlaces: places})
 	default:
 		ThrowApiErr(w, "Invalid API operation", nil, 400)
 	}
