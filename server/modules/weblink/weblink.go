@@ -398,6 +398,10 @@ func apiPubReviews(w http.ResponseWriter, r *http.Request, operation string, api
 			ThrowApiErr(w, "You must be authorized to perform this action", nil, 401)
 			return
 		}
+		if apireq.PosReq == nil || apireq.PosReq.MyLat == nil || apireq.PosReq.MyLong == nil {
+			ThrowApiErr(w, "Missing required parameters in pos_req", nil, 400)
+			return
+		}
 		if apireq.Review == nil || apireq.Review.PlaceId == nil || apireq.Review.Rating == nil {
 			ThrowApiErr(w, "Missing required parameters in review", nil, 400)
 			return
@@ -407,12 +411,28 @@ func apiPubReviews(w http.ResponseWriter, r *http.Request, operation string, api
 			ThrowApiErr(w, "Token is invalid", err, 401)
 			return
 		}
-		rev, err := dbl.CreateReview(uo, apireq.Review)
+		rev, err := dbl.CreateReview(uo, apireq.Review, apireq.PosReq)
 		if err != nil {
 			ThrowApiErr(w, "Failed to submit a review", err, 500)
 			return
 		}
 		apiRespond(w, &apitypes.API_obj{Review: rev})
+	case "mylist":
+		if apireq == nil || apireq.Initiator == nil || apireq.Initiator.Token == nil {
+			ThrowApiErr(w, "You must be authorized to perform this action", nil, 401)
+			return
+		}
+		uo, err := verifyJWT(apireq.Initiator.Token)
+		if err != nil {
+			ThrowApiErr(w, "Token is invalid", err, 401)
+			return
+		}
+		revs, err := dbl.MyReviews(uo)
+		if err != nil {
+			ThrowApiErr(w, "Failed get a list of reviews", err, 500)
+			return
+		}
+		apiRespond(w, &apitypes.API_obj{Reviews: revs})
 	default:
 		ThrowApiErr(w, "Invalid API operation", nil, 400)
 	}

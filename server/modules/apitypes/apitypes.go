@@ -108,7 +108,8 @@ type Review_Obj struct {
 	CreatedAt *time.Time `json:"created_at,omitempty"`
 	UpdatedAt *time.Time `json:"updated_at,omitempty"`
 
-	Author *User_Obj `json:"author,omitempty"`
+	Author *User_Obj  `json:"author,omitempty"`
+	Place  *Place_Obj `json:"place,omitempty"`
 }
 
 type Place_Obj struct {

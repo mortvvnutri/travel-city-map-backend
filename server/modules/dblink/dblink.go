@@ -576,12 +576,50 @@ func (db *DBwrap) SetDefaultPlace(initiator *apitypes.User_Obj, place *apitypes.
 	return uo, err
 }
 
-func (db *DBwrap) CreateReview(initiator *apitypes.User_Obj, review *apitypes.Review_Obj) (*apitypes.Review_Obj, error) {
+func (db *DBwrap) MyReviews(initiator *apitypes.User_Obj) (*[]apitypes.Review_Obj, error) {
 	if initiator == nil || initiator.Id == nil {
 		return nil, errors.New("authorization is required")
 	}
 
-	if review == nil || review.PlaceId == nil || review.Rating == nil {
+	ret := &[]apitypes.Review_Obj{}
+
+	rows, err := db.db.Query(`SELECT 
+	user_id, place_id,
+	reviews.rating, comment,
+	reviews.created_at, reviews.updated_at,
+	places.id, places.name,
+	places.description, places.lat,
+	places.long, places.rating
+	FROM reviews
+	LEFT JOIN places on places.id=reviews.place_id
+	WHERE reviews.user_id=$1
+	ORDER BY reviews.updated_at DESC`, initiator.Id)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var val apitypes.Review_Obj
+		val.Place = &apitypes.Place_Obj{}
+		rows.Scan(&val.UserId, &val.PlaceId,
+			&val.Rating, &val.Comment,
+			&val.CreatedAt, &val.UpdatedAt,
+			&val.Place.Id, &val.Place.Name,
+			&val.Place.Description, &val.Place.Lat,
+			&val.Place.Long, &val.Place.Rating,
+		)
+		*ret = append(*ret, val)
+	}
+
+	return ret, nil
+}
+
+func (db *DBwrap) CreateReview(initiator *apitypes.User_Obj, review *apitypes.Review_Obj, pos_req *apitypes.PosReq_Obj) (*apitypes.Review_Obj, error) {
+	if initiator == nil || initiator.Id == nil {
+		return nil, errors.New("authorization is required")
+	}
+
+	if review == nil || review.PlaceId == nil || review.Rating == nil || pos_req == nil || pos_req.MyLat == nil || pos_req.MyLong == nil {
 		return nil, errors.New("missing required parameters")
 	}
 
@@ -589,9 +627,23 @@ func (db *DBwrap) CreateReview(initiator *apitypes.User_Obj, review *apitypes.Re
 		return nil, errors.New("review score is invalid")
 	}
 
+	// check distance
+	dist := 100000.0
+	err := db.db.QueryRow(`WITH pl AS (
+		SELECT lat, long FROM places pl WHERE id=$1
+	)
+	SELECT distance($2::real, $3::real, lat, long) FROM pl`, review.PlaceId, pos_req.MyLat, pos_req.MyLong).Scan(&dist)
+	if err != nil {
+		return nil, err
+	}
+
+	if dist > KM {
+		return nil, errors.New("you are too far away from the place to leave a review")
+	}
+
 	// Check if the review already exists
 	chk_rate := -1
-	err := db.db.QueryRow(`SELECT COUNT(rating) FROM reviews WHERE user_id=$1 AND place_id=$2`, initiator.Id, review.PlaceId).Scan(&chk_rate)
+	err = db.db.QueryRow(`SELECT COUNT(rating) FROM reviews WHERE user_id=$1 AND place_id=$2`, initiator.Id, review.PlaceId).Scan(&chk_rate)
 	if err != nil {
 		return nil, err
 	}
